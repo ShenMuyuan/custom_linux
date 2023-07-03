@@ -2,10 +2,29 @@
 
 . utils/add_file.sh
 
+my_kernel_dir=/home/smy/dev/kernel/linux-6.3.6/
+my_kernel_version=6.3.6
+
 add_modules() {
+    if [[ ! -d $my_kernel_dir ]]; then
+        echo "Error: wrong kernel directory $my_kernel_dir"
+        exit
+    fi
     for mod in "$@"; do
-        filename_line=$(modinfo "$mod" | grep filename)
-        path=${filename_line##* }
-        add_file "$path"
+        full_path=$(find $my_kernel_dir -name "$mod".ko)
+        if [[ -z $full_path ]]; then
+            echo "Error: wrong module $mod"
+            exit
+        fi
+        rel_path=${full_path#"$my_kernel_dir"}
+        dest_path=lib/modules/$my_kernel_version/$rel_path
+        dest_root=${dest_path%/*}
+        if [[ ! -e $dest_path ]]; then
+            if [[ ! -d $dest_root ]]; then
+                mkdir -p "$dest_root"
+            fi
+            cp "$full_path" "$dest_path"
+        fi
+
     done
 }

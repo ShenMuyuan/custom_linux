@@ -1,11 +1,11 @@
 #!/bin/bash
 
 . utils/add_commands.sh
-# . utils/add_modules.sh
+. utils/add_modules.sh
 
-rm -rf myinitrd_v0_55
-mkdir myinitrd_v0_55
-cd myinitrd_v0_55 || exit
+rm -rf myinitrd_v0_6
+mkdir myinitrd_v0_6
+cd myinitrd_v0_6 || exit
 
 # make directories
 mkdir -p usr/bin usr/sbin usr/lib usr/lib64
@@ -13,13 +13,70 @@ ln -s usr/bin bin
 ln -s usr/sbin sbin
 ln -s usr/lib lib
 ln -s usr/lib64 lib64
+mkdir run
+mkdir lib/systemd
+cp /lib/systemd/systemd-udevd lib/systemd   # symlink to udevadm
+mkdir lib/udev/
+cp -r /lib/udev/rules.d lib/udev/
 
 # add essential commands
-add_commands bash insmod ls lvm mkdir mount mknod lsblk ln
+add_commands bash insmod ls lvm mkdir mount mknod lsblk ln udevadm dmsetup modprobe lsmod
 
-# add essential modules
-cp ../../dev/kernel/linux-6.3.6/drivers/usb/host/xhci-pci.ko .
-cp ../../dev/kernel/linux-6.3.6/drivers/usb/host/xhci-pci-renesas.ko .
+# prepare for modprobe
+mkdir -p lib/modules/"$my_kernel_version"
+add_modules nvme nvme-core
+cp /lib/modules/"$my_kernel_version"/modules.dep lib/modules/"$my_kernel_version"
+cp /lib/modules/"$my_kernel_version"/modules.dep.bin lib/modules/"$my_kernel_version"
+mkdir -p etc/modprobe.d
+touch etc/modprobe.d/aliases.conf
+tee etc/modprobe.d/aliases.conf <<EOF
+alias pci:v*d*sv*sd*bc01sc08i02* nvme
+alias pci:v0000106Bd00002005sv*sd*bc*sc*i* nvme
+alias pci:v0000106Bd00002003sv*sd*bc*sc*i* nvme
+alias pci:v0000106Bd00002001sv*sd*bc*sc*i* nvme
+alias pci:v00001D0Fd0000CD02sv*sd*bc*sc*i* nvme
+alias pci:v00001D0Fd0000CD01sv*sd*bc*sc*i* nvme
+alias pci:v00001D0Fd0000CD00sv*sd*bc*sc*i* nvme
+alias pci:v00001D0Fd00008061sv*sd*bc*sc*i* nvme
+alias pci:v00001D0Fd00000065sv*sd*bc*sc*i* nvme
+alias pci:v00001D0Fd00000061sv*sd*bc*sc*i* nvme
+alias pci:v00001E4Bd00001202sv*sd*bc*sc*i* nvme
+alias pci:v00001E4Bd00001002sv*sd*bc*sc*i* nvme
+alias pci:v00001E4Bd00001001sv*sd*bc*sc*i* nvme
+alias pci:v00001F40d00005236sv*sd*bc*sc*i* nvme
+alias pci:v00002646d0000501Esv*sd*bc*sc*i* nvme
+alias pci:v00002646d0000501Bsv*sd*bc*sc*i* nvme
+alias pci:v00002646d0000501Asv*sd*bc*sc*i* nvme
+alias pci:v00002646d00005016sv*sd*bc*sc*i* nvme
+alias pci:v00002646d00005018sv*sd*bc*sc*i* nvme
+alias pci:v00002646d00002263sv*sd*bc*sc*i* nvme
+alias pci:v00002646d00002262sv*sd*bc*sc*i* nvme
+alias pci:v00001D97d00002263sv*sd*bc*sc*i* nvme
+alias pci:v000015B7d00002001sv*sd*bc*sc*i* nvme
+alias pci:v00001C5Cd00001504sv*sd*bc*sc*i* nvme
+alias pci:v00001344d00006001sv*sd*bc*sc*i* nvme
+alias pci:v00001344d00005407sv*sd*bc*sc*i* nvme
+alias pci:v00001CC1d00008201sv*sd*bc*sc*i* nvme
+alias pci:v000010ECd00005762sv*sd*bc*sc*i* nvme
+alias pci:v00001CC1d000033F8sv*sd*bc*sc*i* nvme
+alias pci:v00001B4Bd00001092sv*sd*bc*sc*i* nvme
+alias pci:v00001987d00005016sv*sd*bc*sc*i* nvme
+alias pci:v0000144Dd0000A822sv*sd*bc*sc*i* nvme
+alias pci:v0000144Dd0000A821sv*sd*bc*sc*i* nvme
+alias pci:v00001C5Fd00000540sv*sd*bc*sc*i* nvme
+alias pci:v00001C58d00000023sv*sd*bc*sc*i* nvme
+alias pci:v00001C58d00000003sv*sd*bc*sc*i* nvme
+alias pci:v00001BB1d00000100sv*sd*bc*sc*i* nvme
+alias pci:v0000126Fd00002263sv*sd*bc*sc*i* nvme
+alias pci:v00001B36d00000010sv*sd*bc*sc*i* nvme
+alias pci:v00008086d00005845sv*sd*bc*sc*i* nvme
+alias pci:v00008086d0000F1A6sv*sd*bc*sc*i* nvme
+alias pci:v00008086d0000F1A5sv*sd*bc*sc*i* nvme
+alias pci:v00008086d00000A55sv*sd*bc*sc*i* nvme
+alias pci:v00008086d00000A54sv*sd*bc*sc*i* nvme
+alias pci:v00008086d00000A53sv*sd*bc*sc*i* nvme
+alias pci:v00008086d00000953sv*sd*bc*sc*i* nvme
+EOF
 
 # write init script
 touch init
@@ -37,25 +94,16 @@ mkdir -p /var/lock
 mount -t sysfs -o nodev,noexec,nosuid sysfs /sys
 mount -t proc -o nodev,noexec,nosuid proc /proc
 
-# make nodes
-mknod /dev/nvme0n1 b 259 0
-mknod /dev/nvme0n1p1 b 259 1
-mknod /dev/nvme0n1p2 b 259 2
-mknod /dev/nvme0n1p3 b 259 3
-mkdir -p /dev/ubuntu-vg
-mknod /dev/dm-0 b 253 0
-ln -s /dev/dm-0 /dev/ubuntu-vg/ubuntu-lv
-
-# prepare lvm
-lvm vgchange -a y
+# init udev
+mount -t devtmpfs -o nosuid,mode=0755 udev /dev
+SYSTEMD_LOG_LEVEL=info /lib/systemd/systemd-udevd --daemon --resolve-names=never
+udevadm trigger --type=subsystems --action=add
+udevadm trigger --type=devices --action=add
+udevadm settle || true
 
 # mount lvm logical volume to /mnt/my_root
 mkdir -m 0755 -p /mnt/my_root
 mount -t ext4 /dev/ubuntu-vg/ubuntu-lv /mnt/my_root
-
-# keyboard related
-insmod xhci-pci-renesas.ko
-insmod xhci-pci.ko
 
 /bin/bash
 EOF
