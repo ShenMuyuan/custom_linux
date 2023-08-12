@@ -1,7 +1,11 @@
 #!/bin/bash
 
-. utils/add_file.sh
+# Usage: add_modules module1.ko module2.ko ...
+# name only, not path
 
+# Unlike commands and their dynamic linking libraries, kernel modules
+# need to be extracted from kernel with the same version of testing kernel.
+# Modify kernel compile options to get the modules.
 my_kernel_dir=/home/smy/dev/kernel/linux-6.3.6/
 my_kernel_version=6.3.6
 
